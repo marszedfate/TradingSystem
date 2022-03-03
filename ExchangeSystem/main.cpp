@@ -28,7 +28,7 @@ protected:
 	virtual ~Singleton() = default;
 };
 
-template<typename T>
+template<typename T>    // T: "XXXOrder"
 class OrderList {
 public:
 	void PrintOrderList() {
@@ -47,7 +47,7 @@ public:
 		cout << "==========\n";
 	}
 
-	map<int, T*> orderLinkList;    // key: price, value: "XXXOrder"s' linklist, T: "XXXOrder"
+	map<int, T*> orderLinkList;    // key: price, value: "XXXOrder"s' linklist
 };
 
 class Order {
@@ -55,7 +55,7 @@ public:
 	virtual void MatchOrder() = 0;
 
 	template<typename T>    // T: "XXXOrder"
-	void RegisterOrder(T* order, OrderList<T>& orderList);
+	void InsertOrder(T* order, OrderList<T>& orderList);
 
 	template<typename T>
 	void WithdrawOrder(T* order, OrderList<T>& orderList);
@@ -93,17 +93,15 @@ public:
 	BidOrder* next;
 };
 
-class OrderBook {
+static class OrderBook {
 public:
-	OrderBook() = default;
-
 	static void MatchOrderWrapper(Order* order) {
 		order->MatchOrder();
 	}
 	
 	template<typename T>
-	static void RegisterOrderWrapper(T* order, OrderList<T>& orderList) {
-		order->RegisterOrder(order, orderList);
+	static void InsertOrderWrapper(T* order, OrderList<T>& orderList) {
+		order->InsertOrder(order, orderList);
 	}
 
 	template<typename T>
@@ -136,7 +134,7 @@ public:
 		OrderList<BidOrder>& bidOrderList = Singleton<OrderList<BidOrder>>::GetInstance();
 		BidOrder* bidOrder = new BidOrder(orderId, price, quantity);
 		OrderBook::MatchOrderWrapper(bidOrder);
-		OrderBook::RegisterOrderWrapper(bidOrder, bidOrderList);
+		OrderBook::InsertOrderWrapper(bidOrder, bidOrderList);
 	}
 
 	void BXOrderFunc(int orderId, int price, int quantity) {
@@ -149,7 +147,7 @@ public:
 		OrderList<AskOrder>& askOrderList = Singleton<OrderList<AskOrder>>::GetInstance();
 		AskOrder* askOrder = new AskOrder(orderId, price, quantity);
 		OrderBook::MatchOrderWrapper(askOrder);
-		OrderBook::RegisterOrderWrapper(askOrder, askOrderList);
+		OrderBook::InsertOrderWrapper(askOrder, askOrderList);
 	}
 
 	void SXOrderFunc(int orderId, int price, int quantity) {
@@ -173,7 +171,7 @@ private:
 };
 
 template<typename T>
-void Order::RegisterOrder(T* order, OrderList<T>& orderList) {
+void Order::InsertOrder(T* order, OrderList<T>& orderList) {
 	if (!order->quantity) return;
 	auto head = orderList.orderLinkList[order->price];
 	if (head == nullptr) {
@@ -248,7 +246,6 @@ void AskOrder::MatchOrder()
 void BidOrder::MatchOrder() {
 	vector<int> erasePrice;
 	OrderList<AskOrder>& askOrderList = Singleton<OrderList<AskOrder>>::GetInstance();
-	// map<int, AskOrder*>::iterator iter = askOrderList.orderLinkList.lower_bound(price)
 	if (askOrderList.orderLinkList.size() == 0) return;
 	for (map<int, AskOrder*>::iterator iter = askOrderList.orderLinkList.lower_bound(price); true; iter--) {
 		if (iter == askOrderList.orderLinkList.end()) continue;
