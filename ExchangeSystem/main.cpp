@@ -4,6 +4,7 @@
 #include <iostream>
 #include <memory>
 #include <algorithm>
+#include <functional>
 using namespace std;
 
 template<typename T>
@@ -35,13 +36,11 @@ class Order {
 public:
 	virtual void MatchOrder() = 0;
 
-	/*
 	template<typename T>
-	friend void RegisterOrder(T* order, OrderList<T>& orderList);
+	void RegisterOrder(T* order, OrderList<T>& orderList);
 
 	template<typename T>
-	friend void WithdrawOrder(T* order, OrderList<T>& orderList);
-	*/
+	void WithdrawOrder(T* order, OrderList<T>& orderList);
 
 	int orderId;
 	int price;
@@ -86,18 +85,106 @@ public:
 	
 	template<typename T>
 	static void RegisterOrderWrapper(T* order, OrderList<T>& orderList) {
-		RegisterOrder(order, orderList);
+		order->RegisterOrder(order, orderList);
 	}
 
 	template<typename T>
 	static void WithdrawOrderWrapper(T* order, OrderList<T>& orderList) {
-		WithdrawOrder(order, orderList);
+		order->WithdrawOrder(order, orderList);
 	}
 
 // private:
 //	OrderList<AskOrder> &askOrderList;
 //	OrderList<BidOrder> &bidOrderList;
 };
+
+class RegisterFactory {
+public:
+	RegisterFactory() {
+		orderFuncMap["BA"] = this->BAOrderFunc;
+		orderFuncMap["BX"] = this->BXOrderFunc;
+		orderFuncMap["SA"] = this->SAOrderFunc;
+		orderFuncMap["SX"] = this->SXOrderFunc;
+	};
+
+	void BAOrderFunc(int orderId, int price, int quantity) {
+		OrderList<BidOrder>& bidOrderList = Singleton<OrderList<BidOrder>>::GetInstance();
+		BidOrder* bidOrder = new BidOrder(orderId, price, quantity);
+		OrderBook::MatchOrderWrapper(bidOrder);
+		OrderBook::RegisterOrderWrapper(bidOrder, bidOrderList);
+	}
+
+	void BXOrderFunc(int orderId, int price, int quantity) {
+		OrderList<BidOrder>& bidOrderList = Singleton<OrderList<BidOrder>>::GetInstance();
+		BidOrder* bidOrder = new BidOrder(orderId, price, quantity);
+		OrderBook::WithdrawOrderWrapper(bidOrder, bidOrderList);
+	}
+
+	void SAOrderFunc(int orderId, int price, int quantity) {
+		OrderList<AskOrder>& askOrderList = Singleton<OrderList<AskOrder>>::GetInstance();
+		AskOrder* askOrder = new AskOrder(orderId, price, quantity);
+		OrderBook::MatchOrderWrapper(askOrder);
+		OrderBook::RegisterOrderWrapper(askOrder, askOrderList);
+	}
+
+	void SXOrderFunc(int orderId, int price, int quantity) {
+		OrderList<AskOrder>& askOrderList = Singleton<OrderList<AskOrder>>::GetInstance();
+		AskOrder* askOrder = new AskOrder(orderId, price, quantity);
+		OrderBook::WithdrawOrderWrapper(askOrder, askOrderList);
+	}
+
+	void CreateOrder(string orderType, int orderId, int price, int quantity) {
+		(*(orderFuncMap[orderType]))(this, orderId, price, quantity);
+	}
+
+private:
+	std::map<string, void (*)(RegisterFactory*, int, int, int)> orderFuncMap;
+};
+
+template<typename T>
+void Order::RegisterOrder(T* order, OrderList<T>& orderList) {
+	if (!order->quantity) return;
+	auto head = orderList.orderLinkList[order->price];
+	if (head == nullptr) {
+		orderList.orderLinkList[order->price] = order;
+	}
+	else {
+		while (head->next) head = head->next;
+		head->next = order;
+	}
+}
+
+template<typename T>
+void Order::WithdrawOrder(T* order, OrderList<T>& orderList) {
+	T* head = orderList.orderLinkList[order->price];
+	if (head == nullptr) {
+		cout << "OrderId: " << order->orderId << " doesn't exist\n";
+		return;
+	}
+	if (head->orderId == order->orderId) {
+		cout << "OrderId: " << order->orderId << " successfully withdraw, price: " << order->price << " ,quantity: " << head->quantity << endl;
+		orderList.orderLinkList[order->price] = head->next;
+		delete head;
+		head = nullptr;
+		if (orderList.orderLinkList[order->price] == nullptr) orderList.orderLinkList.erase(order->price);
+		return;
+	}
+	while (head->next) {
+		if (head->next->orderId != order->orderId) {
+			head = head->next;
+			continue;
+		}
+		cout << "OrderId: " << order->orderId << " successfully withdraw, price: " << order->price << " ,quantity: " << head->next->quantity << endl;
+		auto tmp = head->next;
+		head->next = head->next->next;
+		delete tmp;
+		// head = nullptr;
+		if (orderList.orderLinkList[order->price] == nullptr) orderList.orderLinkList.erase(order->price);
+		return;
+	}
+	cout << "OrderId: " << order->orderId << " doesn't exist\n";
+	return;
+}
 
 void AskOrder::MatchOrder()
 {
@@ -153,51 +240,6 @@ void BidOrder::MatchOrder() {
 	for (auto iter = erasePrice.begin(); iter != erasePrice.end(); iter++) {
 		askOrderList.orderLinkList.erase(*iter);
 	}
-}
-
-template<typename T>
-void RegisterOrder(T* order, OrderList<T>& orderList) {
-	if (!order->quantity) return;
-	auto head = orderList.orderLinkList[order->price];
-	if (head == nullptr) {
-		orderList.orderLinkList[order->price] = order;
-	}
-	else {
-		while (head->next) head = head->next;
-		head->next = order;
-	}
-}
-
-template<typename T>
-void WithdrawOrder(T* order, OrderList<T>& orderList) {
-	T* head = orderList.orderLinkList[order->price];
-	if (head == nullptr) {
-		cout << "OrderId: " << order->orderId << " doesn't exist\n";
-		return;
-	}
-	if (head->orderId == order->orderId) {
-		cout << "OrderId: " << order->orderId << " successfully withdraw, price: " << order->price << " ,quantity: " << head->quantity << endl;
-		orderList.orderLinkList[order->price] = head->next;
-		delete head;
-		head = nullptr;
-		if (orderList.orderLinkList[order->price] == nullptr) orderList.orderLinkList.erase(order->price);
-		return;
-	}
-	while (head->next) {
-		if (head->next->orderId != order->orderId) {
-			head = head->next;
-			continue;
-		}
-		cout << "OrderId: " << order->orderId << " successfully withdraw, price: " << order->price << " ,quantity: " << head->next->quantity << endl;
-		auto tmp = head->next;
-		head->next = head->next->next;
-		delete tmp;
-		// head = nullptr;
-		if (orderList.orderLinkList[order->price] == nullptr) orderList.orderLinkList.erase(order->price);
-		return;
-	}
-	cout << "OrderId: " << order->orderId << " doesn't exist\n";
-	return;
 }
 
 int main()
