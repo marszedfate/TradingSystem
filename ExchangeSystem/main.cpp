@@ -1,8 +1,9 @@
 #include <map>
 #include <mutex>
+#include <memory>
+#include <string>
 #include <vector>
 #include <iostream>
-#include <memory>
 #include <algorithm>
 #include <functional>
 using namespace std;
@@ -29,14 +30,16 @@ protected:
 template<typename T>
 class OrderList {
 public:
-	map<int, T*> orderLinkList;    // key: price, value: orders' linklist
+	map<int, T*> orderLinkList;    // key: price, value: "XXXOrder"s' linklist, T: "XXXOrder"
 };
 
 class Order {
 public:
+	Order() = default;
+
 	virtual void MatchOrder() = 0;
 
-	template<typename T>
+	template<typename T>    // T: "XXXOrder"
 	void RegisterOrder(T* order, OrderList<T>& orderList);
 
 	template<typename T>
@@ -101,10 +104,10 @@ public:
 class RegisterFactory {
 public:
 	RegisterFactory() {
-		orderFuncMap["BA"] = this->BAOrderFunc;
-		orderFuncMap["BX"] = this->BXOrderFunc;
-		orderFuncMap["SA"] = this->SAOrderFunc;
-		orderFuncMap["SX"] = this->SXOrderFunc;
+		orderFuncMap["BA"] = &RegisterFactory::BAOrderFunc;
+		orderFuncMap["BX"] = &RegisterFactory::BXOrderFunc;
+		orderFuncMap["SA"] = &RegisterFactory::SAOrderFunc;
+		orderFuncMap["SX"] = &RegisterFactory::SXOrderFunc;
 	};
 
 	void BAOrderFunc(int orderId, int price, int quantity) {
@@ -134,11 +137,17 @@ public:
 	}
 
 	void CreateOrder(string orderType, int orderId, int price, int quantity) {
-		(*(orderFuncMap[orderType]))(this, orderId, price, quantity);
+		(this->*(orderFuncMap[orderType]))(orderId, price, quantity);
+	}
+
+	~RegisterFactory() {
+		/*
+		TODO: Delete all "XXXOrder"s here.
+		*/
 	}
 
 private:
-	std::map<string, void (*)(RegisterFactory*, int, int, int)> orderFuncMap;
+	map<string, void (RegisterFactory::*)(int, int, int)> orderFuncMap;
 };
 
 template<typename T>
