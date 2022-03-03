@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <fstream>
 #include <iostream>
 #include <algorithm>
 #include <functional>
@@ -30,13 +31,27 @@ protected:
 template<typename T>
 class OrderList {
 public:
+	void PrintOrderList() {
+		cout << "==========\n";
+		cout << typeid(T).name() << ":\n";
+		for (auto iter = orderLinkList.rbegin(); iter != orderLinkList.rend(); iter++) {
+			int price = iter->first;
+			cout << price << ": ";
+			T* head = iter->second;
+			while (head != nullptr) {
+				cout << head->quantity << " ";
+				head = head->next;
+			}
+			cout << endl;
+		}
+		cout << "==========\n";
+	}
+
 	map<int, T*> orderLinkList;    // key: price, value: "XXXOrder"s' linklist, T: "XXXOrder"
 };
 
 class Order {
 public:
-	Order() = default;
-
 	virtual void MatchOrder() = 0;
 
 	template<typename T>    // T: "XXXOrder"
@@ -94,6 +109,13 @@ public:
 	template<typename T>
 	static void WithdrawOrderWrapper(T* order, OrderList<T>& orderList) {
 		order->WithdrawOrder(order, orderList);
+	}
+
+	static void PrintOrderListWrapper() {
+		OrderList<BidOrder>& bidOrderList = Singleton<OrderList<BidOrder>>::GetInstance();
+		OrderList<AskOrder>& askOrderList = Singleton<OrderList<AskOrder>>::GetInstance();
+		bidOrderList.PrintOrderList();
+		askOrderList.PrintOrderList();
 	}
 
 // private:
@@ -167,11 +189,12 @@ template<typename T>
 void Order::WithdrawOrder(T* order, OrderList<T>& orderList) {
 	T* head = orderList.orderLinkList[order->price];
 	if (head == nullptr) {
-		cout << "OrderId: " << order->orderId << " doesn't exist\n";
+		cout << "Withdraw failed      , orderId: " << order->orderId << "\n";
+		orderList.orderLinkList.erase(order->price);
 		return;
 	}
 	if (head->orderId == order->orderId) {
-		cout << "OrderId: " << order->orderId << " successfully withdraw, price: " << order->price << " ,quantity: " << head->quantity << endl;
+		cout << "Withdraw successfully, orderId: " << order->orderId << ", price: " << order->price << ", quantity: " << head->quantity << endl;
 		orderList.orderLinkList[order->price] = head->next;
 		delete head;
 		head = nullptr;
@@ -183,7 +206,7 @@ void Order::WithdrawOrder(T* order, OrderList<T>& orderList) {
 			head = head->next;
 			continue;
 		}
-		cout << "OrderId: " << order->orderId << " successfully withdraw, price: " << order->price << " ,quantity: " << head->next->quantity << endl;
+		cout << "Withdraw successfully, orderId: " << order->orderId << ", price: " << order->price << ", quantity: " << head->next->quantity << endl;
 		auto tmp = head->next;
 		head->next = head->next->next;
 		delete tmp;
@@ -191,7 +214,7 @@ void Order::WithdrawOrder(T* order, OrderList<T>& orderList) {
 		if (orderList.orderLinkList[order->price] == nullptr) orderList.orderLinkList.erase(order->price);
 		return;
 	}
-	cout << "OrderId: " << order->orderId << " doesn't exist\n";
+	cout << "Withdraw failed      , orderId: " << order->orderId << "\n";
 	return;
 }
 
@@ -207,6 +230,7 @@ void AskOrder::MatchOrder()
 			int minQuantity = min(quantity, head->quantity);
 			quantity -= minQuantity;
 			head->quantity -= minQuantity;
+			cout << "Trade happen         , orderId: " << orderId << ' ' << head->orderId << ", price: " << bidPrice << ", quantity: " << minQuantity << endl;
 			if (head->quantity == 0) {
 				BidOrder* tmp = head;
 				head = head->next;
@@ -224,7 +248,10 @@ void AskOrder::MatchOrder()
 void BidOrder::MatchOrder() {
 	vector<int> erasePrice;
 	OrderList<AskOrder>& askOrderList = Singleton<OrderList<AskOrder>>::GetInstance();
-	for (map<int, AskOrder*>::iterator iter = askOrderList.orderLinkList.lower_bound(price); iter != askOrderList.orderLinkList.end(); iter--) {
+	// map<int, AskOrder*>::iterator iter = askOrderList.orderLinkList.lower_bound(price)
+	if (askOrderList.orderLinkList.size() == 0) return;
+	for (map<int, AskOrder*>::iterator iter = askOrderList.orderLinkList.lower_bound(price); true; iter--) {
+		if (iter == askOrderList.orderLinkList.end()) continue;
 		if (quantity == 0) break;
 		int askPrice = iter->first;
 		if (askPrice > price) {
@@ -236,6 +263,7 @@ void BidOrder::MatchOrder() {
 			int minQuantity = min(quantity, head->quantity);
 			quantity -= minQuantity;
 			head->quantity -= minQuantity;
+			cout << "Trade happen         , orderId: " << orderId << ' ' << head->orderId << ", price: " << price << ", quantity: " << minQuantity << endl;
 			if (head->quantity == 0) {
 				AskOrder* tmp = head;
 				head = head->next;
@@ -251,41 +279,33 @@ void BidOrder::MatchOrder() {
 	}
 }
 
+void input() {
+	ifstream in("in.txt");
+	string orderRecord;
+	if (!in.is_open()) {
+		cout << "no file open\n";
+		return;
+	}
+	RegisterFactory factory;
+	while (getline(in, orderRecord))
+	{
+		int indexOfComma[4];
+		for (int i = 0, cnt = 0; i < orderRecord.size(); i++) {
+			if (orderRecord[i] == ',') indexOfComma[cnt++] = i;
+		}
+		string orderType(""); 
+		orderType += orderRecord[indexOfComma[1] + 1];
+		orderType += orderRecord[0];
+		int orderId = stoi(orderRecord.substr(indexOfComma[0] + 1, indexOfComma[1] - indexOfComma[0] - 1));
+		int quantity = stoi(orderRecord.substr(indexOfComma[2] + 1, indexOfComma[3] - indexOfComma[2] - 1));
+		int price = stoi(orderRecord.substr(indexOfComma[3] + 1));
+		factory.CreateOrder(orderType, orderId, price, quantity);
+	}
+	OrderBook::PrintOrderListWrapper();
+}
+
 int main()
 {
-	OrderList<BidOrder>& bidOrderList = Singleton<OrderList<BidOrder>>::GetInstance();
-	OrderList<AskOrder>& askOrderList = Singleton<OrderList<AskOrder>>::GetInstance();
-	/*
-	BidOrder* bid1 = new BidOrder(1, 2, 2);
-	BidOrder* bid2 = new BidOrder(2, 2, 3);
-	OrderBook::RegisterOrderWrapper(bid1, bidOrderList);
-	OrderBook::RegisterOrderWrapper(bid2, bidOrderList);
-
-	// BidOrder* bid3 = new BidOrder(2, 3, 5);
-	// OrderBook::WithdrawOrderWrapper(bid3, bidOrderList);
-
-	AskOrder* bid4 = new AskOrder(3, 1, 6);
-	OrderBook::MatchOrderWrapper(bid4);
-	*/
-
-	AskOrder* bid1 = new AskOrder(1, 2, 2);
-	AskOrder* bid2 = new AskOrder(2, 4, 3);
-	OrderBook::RegisterOrderWrapper(bid1, askOrderList);
-	OrderBook::RegisterOrderWrapper(bid2, askOrderList);
-
-	// BidOrder* bid3 = new BidOrder(2, 3, 5);
-	// OrderBook::WithdrawOrderWrapper(bid3, bidOrderList);
-
-	BidOrder* bid4 = new BidOrder(3, 3, 6);
-	OrderBook::MatchOrderWrapper(bid4);
-
-	for (auto iter = bidOrderList.orderLinkList.begin(); iter != bidOrderList.orderLinkList.end(); iter++) {
-		cout << iter->first << ": \n";
-		BidOrder* head = iter->second;
-		while (head) {
-			cout << head->orderId << ' ' << head->price << ' ' << head->quantity << "\n";
-			head = head->next;
-		}
-	}
+	input();
 	return 0;
 }
