@@ -35,11 +35,13 @@ class Order {
 public:
 	virtual void MatchOrder() = 0;
 
+	/*
 	template<typename T>
 	friend void RegisterOrder(T* order, OrderList<T>& orderList);
 
 	template<typename T>
 	friend void WithdrawOrder(T* order, OrderList<T>& orderList);
+	*/
 
 	int orderId;
 	int price;
@@ -76,7 +78,7 @@ public:
 
 class OrderBook {
 public:
-	OrderBook() {}
+	OrderBook() = default;
 
 	static void MatchOrderWrapper(Order* order) {
 		order->MatchOrder();
@@ -99,14 +101,16 @@ public:
 
 void AskOrder::MatchOrder()
 {
+	vector<int> erasePrice;
 	OrderList<BidOrder>& bidOrderList = Singleton<OrderList<BidOrder>>::GetInstance();
 	for (auto iter = bidOrderList.orderLinkList.rbegin(); iter != bidOrderList.orderLinkList.rend(); iter++) {
 		int bidPrice = iter->first;
 		if (bidPrice < price || quantity == 0) break;
 		BidOrder* head = iter->second;
 		while (head != nullptr && quantity) {
-			quantity -= min(quantity, head->quantity);
-			head->quantity -= min(quantity, head->quantity);
+			int minQuantity = min(quantity, head->quantity);
+			quantity -= minQuantity;
+			head->quantity -= minQuantity;
 			if (head->quantity == 0) {
 				BidOrder* tmp = head;
 				head = head->next;
@@ -114,11 +118,15 @@ void AskOrder::MatchOrder()
 			}
 		}
 		iter->second = head;
-		if (iter->second == nullptr) bidOrderList.orderLinkList.erase(price);
+		if (iter->second == nullptr) erasePrice.push_back(bidPrice);
+	}
+	for (auto iter = erasePrice.begin(); iter != erasePrice.end(); iter++) {
+		bidOrderList.orderLinkList.erase(*iter);
 	}
 }
 
 void BidOrder::MatchOrder() {
+	vector<int> erasePrice;
 	OrderList<AskOrder>& askOrderList = Singleton<OrderList<AskOrder>>::GetInstance();
 	for (map<int, AskOrder*>::iterator iter = askOrderList.orderLinkList.lower_bound(price); iter != askOrderList.orderLinkList.end(); iter--) {
 		if (quantity == 0) break;
@@ -129,8 +137,9 @@ void BidOrder::MatchOrder() {
 		}
 		AskOrder* head = iter->second;
 		while (head != nullptr && quantity) {
-			quantity -= min(quantity, head->quantity);
-			head->quantity -= min(quantity, head->quantity);
+			int minQuantity = min(quantity, head->quantity);
+			quantity -= minQuantity;
+			head->quantity -= minQuantity;
 			if (head->quantity == 0) {
 				AskOrder* tmp = head;
 				head = head->next;
@@ -138,8 +147,11 @@ void BidOrder::MatchOrder() {
 			}
 		}
 		iter->second = head;
-		if (iter->second == nullptr) askOrderList.orderLinkList.erase(price);
+		if (iter->second == nullptr) erasePrice.push_back(askPrice);
 		if (iter == askOrderList.orderLinkList.begin()) break;
+	}
+	for (auto iter = erasePrice.begin(); iter != erasePrice.end(); iter++) {
+		askOrderList.orderLinkList.erase(*iter);
 	}
 }
 
@@ -180,7 +192,7 @@ void WithdrawOrder(T* order, OrderList<T>& orderList) {
 		auto tmp = head->next;
 		head->next = head->next->next;
 		delete tmp;
-		head = nullptr;
+		// head = nullptr;
 		if (orderList.orderLinkList[order->price] == nullptr) orderList.orderLinkList.erase(order->price);
 		return;
 	}
@@ -192,6 +204,7 @@ int main()
 {
 	OrderList<BidOrder>& bidOrderList = Singleton<OrderList<BidOrder>>::GetInstance();
 	OrderList<AskOrder>& askOrderList = Singleton<OrderList<AskOrder>>::GetInstance();
+	/*
 	BidOrder* bid1 = new BidOrder(1, 2, 2);
 	BidOrder* bid2 = new BidOrder(2, 2, 3);
 	OrderBook::RegisterOrderWrapper(bid1, bidOrderList);
@@ -200,9 +213,21 @@ int main()
 	// BidOrder* bid3 = new BidOrder(2, 3, 5);
 	// OrderBook::WithdrawOrderWrapper(bid3, bidOrderList);
 
-	AskOrder* bid4 = new AskOrder(3, 2, 1);
+	AskOrder* bid4 = new AskOrder(3, 1, 6);
 	OrderBook::MatchOrderWrapper(bid4);
-	
+	*/
+
+	AskOrder* bid1 = new AskOrder(1, 2, 2);
+	AskOrder* bid2 = new AskOrder(2, 4, 3);
+	OrderBook::RegisterOrderWrapper(bid1, askOrderList);
+	OrderBook::RegisterOrderWrapper(bid2, askOrderList);
+
+	// BidOrder* bid3 = new BidOrder(2, 3, 5);
+	// OrderBook::WithdrawOrderWrapper(bid3, bidOrderList);
+
+	BidOrder* bid4 = new BidOrder(3, 3, 6);
+	OrderBook::MatchOrderWrapper(bid4);
+
 	for (auto iter = bidOrderList.orderLinkList.begin(); iter != bidOrderList.orderLinkList.end(); iter++) {
 		cout << iter->first << ": \n";
 		BidOrder* head = iter->second;
