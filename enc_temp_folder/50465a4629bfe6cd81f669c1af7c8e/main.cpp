@@ -97,6 +97,51 @@ public:
 //	OrderList<BidOrder> &bidOrderList;
 };
 
+template<typename T>
+void RegisterOrder(T* order, OrderList<T>& orderList) {
+	if (!order->quantity) return;
+	auto head = orderList.orderLinkList[order->price];
+	if (head == nullptr) {
+		orderList.orderLinkList[order->price] = order;
+	}
+	else {
+		while (head->next) head = head->next;
+		head->next = order;
+	}
+}
+
+template<typename T>
+void WithdrawOrder(T* order, OrderList<T>& orderList) {
+	T* head = orderList.orderLinkList[order->price];
+	if (head == nullptr) {
+		cout << "OrderId: " << order->orderId << " doesn't exist\n";
+		return;
+	}
+	if (head->orderId == order->orderId) {
+		cout << "OrderId: " << order->orderId << " successfully withdraw, price: " << order->price << " ,quantity: " << head->quantity << endl;
+		orderList.orderLinkList[order->price] = head->next;
+		delete head;
+		head = nullptr;
+		if (orderList.orderLinkList[order->price] == nullptr) orderList.orderLinkList.erase(order->price);
+		return;
+	}
+	while (head->next) {
+		if (head->next->orderId != order->orderId) {
+			head = head->next;
+			continue;
+		}
+		cout << "OrderId: " << order->orderId << " successfully withdraw, price: " << order->price << " ,quantity: " << head->next->quantity << endl;
+		auto tmp = head->next;
+		head->next = head->next->next;
+		delete tmp;
+		head = nullptr;
+		if (orderList.orderLinkList[order->price] == nullptr) orderList.orderLinkList.erase(order->price);
+		return;
+	}
+	cout << "OrderId: " << order->orderId << " doesn't exist\n";
+	return;
+}
+
 void AskOrder::MatchOrder()
 {
 	OrderList<BidOrder>& bidOrderList = Singleton<OrderList<BidOrder>>::GetInstance();
@@ -141,51 +186,6 @@ void BidOrder::MatchOrder() {
 		if (iter->second == nullptr) askOrderList.orderLinkList.erase(price);
 		if (iter == askOrderList.orderLinkList.begin()) break;
 	}
-}
-
-template<typename T>
-void RegisterOrder(T* order, OrderList<T>& orderList) {
-	if (!order->quantity) return;
-	auto head = orderList.orderLinkList[order->price];
-	if (head == nullptr) {
-		orderList.orderLinkList[order->price] = order;
-	}
-	else {
-		while (head->next) head = head->next;
-		head->next = order;
-	}
-}
-
-template<typename T>
-void WithdrawOrder(T* order, OrderList<T>& orderList) {
-	T* head = orderList.orderLinkList[order->price];
-	if (head == nullptr) {
-		cout << "OrderId: " << order->orderId << " doesn't exist\n";
-		return;
-	}
-	if (head->orderId == order->orderId) {
-		cout << "OrderId: " << order->orderId << " successfully withdraw, price: " << order->price << " ,quantity: " << head->quantity << endl;
-		orderList.orderLinkList[order->price] = head->next;
-		delete head;
-		head = nullptr;
-		if (orderList.orderLinkList[order->price] == nullptr) orderList.orderLinkList.erase(order->price);
-		return;
-	}
-	while (head->next) {
-		if (head->next->orderId != order->orderId) {
-			head = head->next;
-			continue;
-		}
-		cout << "OrderId: " << order->orderId << " successfully withdraw, price: " << order->price << " ,quantity: " << head->next->quantity << endl;
-		auto tmp = head->next;
-		head->next = head->next->next;
-		delete tmp;
-		head = nullptr;
-		if (orderList.orderLinkList[order->price] == nullptr) orderList.orderLinkList.erase(order->price);
-		return;
-	}
-	cout << "OrderId: " << order->orderId << " doesn't exist\n";
-	return;
 }
 
 int main()
