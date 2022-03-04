@@ -61,8 +61,6 @@ template<typename T>    // T: "XXXOrder"
 class OrderList {
 public:
 	void PrintOrderList() const {
-		cout << "==========\n";
-		cout << typeid(T).name() << ":\n";
 		for (auto iter = orderLinkList.rbegin(); iter != orderLinkList.rend(); iter++) {
 			int price = iter->first;
 			cout << price << ": ";
@@ -73,7 +71,6 @@ public:
 			}
 			cout << endl;
 		}
-		cout << "==========\n";
 	}
 
 	~OrderList() {
@@ -103,8 +100,11 @@ public:
 	}
 
 	static void PrintOrderListWrapper(const OrderList<AskOrder>& askOrderList, const OrderList<BidOrder>& bidOrderList) {
+		cout << "\n==========\nASK\n";
 		askOrderList.PrintOrderList();
+		cout << "----------\n";
 		bidOrderList.PrintOrderList();
+		cout << "BID\n==========\n\n";
 	}
 };
 
@@ -180,7 +180,7 @@ void Order::WithdrawOrder(T* order, OrderList<T>& orderList) {
 		return;
 	}
 	if (head->orderId == order->orderId) {
-		cout << "Withdraw successfully, orderId: " << order->orderId << ", price: " << order->price << ", quantity: " << head->quantity << endl;
+		cout << "Withdraw successfully, orderId: " << order->orderId << "\n";
 		orderLinkList[order->price] = head->next;
 		delete head;
 		head = nullptr;
@@ -192,7 +192,7 @@ void Order::WithdrawOrder(T* order, OrderList<T>& orderList) {
 			head = head->next;
 			continue;
 		}
-		cout << "Withdraw successfully, orderId: " << order->orderId << ", price: " << order->price << ", quantity: " << head->next->quantity << endl;
+		cout << "Withdraw successfully, orderId: " << order->orderId << "\n";
 		auto tmp = head->next;
 		head->next = head->next->next;
 		delete tmp;
@@ -247,7 +247,7 @@ void BidOrder::MatchOrder(OrderList<AskOrder>& askOrderList) {
 			int minQuantity = min(quantity, head->quantity);
 			quantity -= minQuantity;
 			head->quantity -= minQuantity;
-			cout << "Trade happen         , orderId: " << orderId << ' ' << head->orderId << ", price: " << price << ", quantity: " << minQuantity << endl;
+			cout << "Trade happen         , orderId: " << head->orderId << ' ' << orderId << ", price: " << price << ", quantity: " << minQuantity << endl;
 			if (head->quantity == 0) {
 				AskOrder* tmp = head;
 				head = head->next;
