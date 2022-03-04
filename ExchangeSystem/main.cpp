@@ -1,5 +1,4 @@
 #include <map>
-#include <any>
 #include <mutex>
 #include <memory>
 #include <string>
@@ -8,7 +7,6 @@
 #include <iostream>
 #include <algorithm>
 #include <functional>
-#include <initializer_list>
 // #pragma warning: (disable: 4996)
 using namespace std;
 
@@ -18,10 +16,10 @@ class OrderList;
 class Order {
 public:
 	template<typename T>    // T: "XXXOrder"
-	void InsertOrder(T* order, OrderList<T>* orderList);
+	void InsertOrder(T* order, OrderList<T>& orderList);
 
 	template<typename T>
-	void WithdrawOrder(T* order, OrderList<T>* orderList);
+	void WithdrawOrder(T* order, OrderList<T>& orderList);
 
 	int orderId;
 	int price;
@@ -40,7 +38,7 @@ public:
 		this->next = nullptr;
 	}
 	
-	void MatchOrder(OrderList<BidOrder>* bidOrderList);
+	void MatchOrder(OrderList<BidOrder>& bidOrderList);
 
 	AskOrder* next;
 };
@@ -54,7 +52,7 @@ public:
 		this->next = nullptr;
 	}
 
-	void MatchOrder(OrderList<AskOrder>* askOrderList);
+	void MatchOrder(OrderList<AskOrder>& askOrderList);
 
 	BidOrder* next;
 };
@@ -90,17 +88,17 @@ public:
 static class OrderBook {
 public:
 	template<typename T1, typename T2>
-	static void MatchOrderWrapper(T1* order, OrderList<T2>* matchOrderList) {    // (order: askOrder) -> (matchOrderList: bidOrderList)
+	static void MatchOrderWrapper(T1* order, OrderList<T2>& matchOrderList) {    // (order: askOrder) -> (matchOrderList: bidOrderList)
 		order->MatchOrder(matchOrderList);
 	}
 	
 	template<typename T>
-	static void InsertOrderWrapper(T* order, OrderList<T>* orderList) {
+	static void InsertOrderWrapper(T* order, OrderList<T>& orderList) {
 		order->InsertOrder(order, orderList);
 	}
 
 	template<typename T>
-	static void WithdrawOrderWrapper(T* order, OrderList<T>* orderList) {
+	static void WithdrawOrderWrapper(T* order, OrderList<T>& orderList) {
 		order->WithdrawOrder(order, orderList);
 	}
 
@@ -121,24 +119,24 @@ public:
 
 	void BAOrderFunc(int orderId, int price, int quantity) {
 		BidOrder* bidOrder = new BidOrder(orderId, price, quantity);
-		OrderBook::MatchOrderWrapper(bidOrder, &askOrderList);
-		OrderBook::InsertOrderWrapper(bidOrder, &bidOrderList);
+		OrderBook::MatchOrderWrapper(bidOrder, askOrderList);
+		OrderBook::InsertOrderWrapper(bidOrder, bidOrderList);
 	}
 
 	void BXOrderFunc(int orderId, int price, int quantity) {
 		BidOrder* bidOrder = new BidOrder(orderId, price, quantity);
-		OrderBook::WithdrawOrderWrapper(bidOrder, &bidOrderList);
+		OrderBook::WithdrawOrderWrapper(bidOrder, bidOrderList);
 	}
 
 	void SAOrderFunc(int orderId, int price, int quantity) {
 		AskOrder* askOrder = new AskOrder(orderId, price, quantity);
-		OrderBook::MatchOrderWrapper(askOrder, &bidOrderList);
-		OrderBook::InsertOrderWrapper(askOrder, &askOrderList);
+		OrderBook::MatchOrderWrapper(askOrder, bidOrderList);
+		OrderBook::InsertOrderWrapper(askOrder, askOrderList);
 	}
 
 	void SXOrderFunc(int orderId, int price, int quantity) {
 		AskOrder* askOrder = new AskOrder(orderId, price, quantity);
-		OrderBook::WithdrawOrderWrapper(askOrder, &askOrderList);
+		OrderBook::WithdrawOrderWrapper(askOrder, askOrderList);
 	}
 
 	void CreateOrder(string orderType, int orderId, int price, int quantity) {
@@ -159,9 +157,9 @@ private:
 };
 
 template<typename T>
-void Order::InsertOrder(T* order, OrderList<T>* orderList) {
+void Order::InsertOrder(T* order, OrderList<T>& orderList) {
 	if (!order->quantity) return;
-	auto& orderLinkList = orderList->orderLinkList;
+	auto& orderLinkList = orderList.orderLinkList;
 	auto head = orderLinkList[order->price];
 	if (head == nullptr) {
 		orderLinkList[order->price] = order;
@@ -173,8 +171,8 @@ void Order::InsertOrder(T* order, OrderList<T>* orderList) {
 }
 
 template<typename T>
-void Order::WithdrawOrder(T* order, OrderList<T>* orderList) {
-	auto& orderLinkList = orderList->orderLinkList;
+void Order::WithdrawOrder(T* order, OrderList<T>& orderList) {
+	auto& orderLinkList = orderList.orderLinkList;
 	T* head = orderLinkList[order->price];
 	if (head == nullptr) {
 		cout << "Withdraw failed      , orderId: " << order->orderId << "\n";
@@ -206,9 +204,9 @@ void Order::WithdrawOrder(T* order, OrderList<T>* orderList) {
 	return;
 }
 
-void AskOrder::MatchOrder(OrderList<BidOrder>* bidOrderList) {
+void AskOrder::MatchOrder(OrderList<BidOrder>& bidOrderList) {
 	vector<int> erasePrice;
-	auto& bidOrderLinkList = bidOrderList->orderLinkList;
+	auto& bidOrderLinkList = bidOrderList.orderLinkList;
 	for (auto iter = bidOrderLinkList.rbegin(); iter != bidOrderLinkList.rend(); iter++) {
 		int bidPrice = iter->first;
 		if (bidPrice < price || quantity == 0) break;
@@ -232,9 +230,9 @@ void AskOrder::MatchOrder(OrderList<BidOrder>* bidOrderList) {
 	}
 }
 
-void BidOrder::MatchOrder(OrderList<AskOrder>* askOrderList) {
+void BidOrder::MatchOrder(OrderList<AskOrder>& askOrderList) {
 	vector<int> erasePrice;
-	auto& askOrderLinkList = askOrderList->orderLinkList;
+	auto& askOrderLinkList = askOrderList.orderLinkList;
 	if (askOrderLinkList.size() == 0) return;
 	for (map<int, AskOrder*>::iterator iter = askOrderLinkList.lower_bound(price); true; iter--) {
 		if (iter == askOrderLinkList.end()) continue;
