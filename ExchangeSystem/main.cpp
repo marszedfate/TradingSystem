@@ -1,4 +1,5 @@
 #include <map>
+#include <any>
 #include <mutex>
 #include <memory>
 #include <string>
@@ -7,31 +8,61 @@
 #include <iostream>
 #include <algorithm>
 #include <functional>
+#include <initializer_list>
+// #pragma warning: (disable: 4996)
 using namespace std;
 
-template<typename T>
-class Singleton
-{
+template<typename T>    // T: "XXXOrder"
+class OrderList;
+
+class Order {
 public:
-	static T& GetInstance()
-	{
-		static T instance;
-		return instance;
+	template<typename T>    // T: "XXXOrder"
+	void InsertOrder(T* order, OrderList<T>* orderList);
+
+	template<typename T>
+	void WithdrawOrder(T* order, OrderList<T>* orderList);
+
+	int orderId;
+	int price;
+	int quantity;
+};
+
+class AskOrder;
+class BidOrder;
+
+class AskOrder : public Order {
+public:
+	AskOrder(int orderId, int price, int quantity) {
+		this->orderId = orderId;
+		this->price = price;
+		this->quantity = quantity;
+		this->next = nullptr;
+	}
+	
+	void MatchOrder(OrderList<BidOrder>* bidOrderList);
+
+	AskOrder* next;
+};
+
+class BidOrder : public Order {
+public:
+	BidOrder(int orderId, int price, int quantity) {
+		this->orderId = orderId;
+		this->price = price;
+		this->quantity = quantity;
+		this->next = nullptr;
 	}
 
-	Singleton(T&&) = delete;
-	Singleton(const T&) = delete;
-	void operator= (const T&) = delete;
+	void MatchOrder(OrderList<AskOrder>* askOrderList);
 
-protected:
-	Singleton() = default;
-	virtual ~Singleton() = default;
+	BidOrder* next;
 };
 
 template<typename T>    // T: "XXXOrder"
 class OrderList {
 public:
-	void PrintOrderList() {
+	void PrintOrderList() const {
 		cout << "==========\n";
 		cout << typeid(T).name() << ":\n";
 		for (auto iter = orderLinkList.rbegin(); iter != orderLinkList.rend(); iter++) {
@@ -47,78 +78,36 @@ public:
 		cout << "==========\n";
 	}
 
+	~OrderList() {
+		/*
+		TODO: delete LinkList here
+		*/
+	}
+
 	map<int, T*> orderLinkList;    // key: price, value: "XXXOrder"s' linklist
-};
-
-class Order {
-public:
-	virtual void MatchOrder() = 0;
-
-	template<typename T>    // T: "XXXOrder"
-	void InsertOrder(T* order, OrderList<T>& orderList);
-
-	template<typename T>
-	void WithdrawOrder(T* order, OrderList<T>& orderList);
-
-	int orderId;
-	int price;
-	int quantity;
-};
-
-class AskOrder : public Order {
-public:
-	AskOrder(int orderId, int price, int quantity) {
-		this->orderId = orderId;
-		this->price = price;
-		this->quantity = quantity;
-		this->next = nullptr;
-	}
-	
-	void MatchOrder(); 
-
-	AskOrder* next;
-};
-
-class BidOrder : public Order {
-public:
-	BidOrder(int orderId, int price, int quantity) {
-		this->orderId = orderId;
-		this->price = price;
-		this->quantity = quantity;
-		this->next = nullptr;
-	}
-
-	void MatchOrder();
-
-	BidOrder* next;
 };
 
 static class OrderBook {
 public:
-	static void MatchOrderWrapper(Order* order) {
-		order->MatchOrder();
+	template<typename T1, typename T2>
+	static void MatchOrderWrapper(T1* order, OrderList<T2>* matchOrderList) {    // (order: askOrder) -> (matchOrderList: bidOrderList)
+		order->MatchOrder(matchOrderList);
 	}
 	
 	template<typename T>
-	static void InsertOrderWrapper(T* order, OrderList<T>& orderList) {
+	static void InsertOrderWrapper(T* order, OrderList<T>* orderList) {
 		order->InsertOrder(order, orderList);
 	}
 
 	template<typename T>
-	static void WithdrawOrderWrapper(T* order, OrderList<T>& orderList) {
+	static void WithdrawOrderWrapper(T* order, OrderList<T>* orderList) {
 		order->WithdrawOrder(order, orderList);
 	}
 
-	static void PrintOrderListWrapper() {
-		OrderList<BidOrder>& bidOrderList = Singleton<OrderList<BidOrder>>::GetInstance();
-		OrderList<AskOrder>& askOrderList = Singleton<OrderList<AskOrder>>::GetInstance();
-		bidOrderList.PrintOrderList();
+	static void PrintOrderListWrapper(const OrderList<AskOrder>& askOrderList, const OrderList<BidOrder>& bidOrderList) {
 		askOrderList.PrintOrderList();
+		bidOrderList.PrintOrderList();
 	}
-
-// private:
-//	OrderList<AskOrder> &askOrderList;
-//	OrderList<BidOrder> &bidOrderList;
 };
 
 class RegisterFactory {
@@ -131,29 +120,25 @@ public:
 	};
 
 	void BAOrderFunc(int orderId, int price, int quantity) {
-		OrderList<BidOrder>& bidOrderList = Singleton<OrderList<BidOrder>>::GetInstance();
 		BidOrder* bidOrder = new BidOrder(orderId, price, quantity);
-		OrderBook::MatchOrderWrapper(bidOrder);
-		OrderBook::InsertOrderWrapper(bidOrder, bidOrderList);
+		OrderBook::MatchOrderWrapper(bidOrder, &askOrderList);
+		OrderBook::InsertOrderWrapper(bidOrder, &bidOrderList);
 	}
 
 	void BXOrderFunc(int orderId, int price, int quantity) {
-		OrderList<BidOrder>& bidOrderList = Singleton<OrderList<BidOrder>>::GetInstance();
 		BidOrder* bidOrder = new BidOrder(orderId, price, quantity);
-		OrderBook::WithdrawOrderWrapper(bidOrder, bidOrderList);
+		OrderBook::WithdrawOrderWrapper(bidOrder, &bidOrderList);
 	}
 
 	void SAOrderFunc(int orderId, int price, int quantity) {
-		OrderList<AskOrder>& askOrderList = Singleton<OrderList<AskOrder>>::GetInstance();
 		AskOrder* askOrder = new AskOrder(orderId, price, quantity);
-		OrderBook::MatchOrderWrapper(askOrder);
-		OrderBook::InsertOrderWrapper(askOrder, askOrderList);
+		OrderBook::MatchOrderWrapper(askOrder, &bidOrderList);
+		OrderBook::InsertOrderWrapper(askOrder, &askOrderList);
 	}
 
 	void SXOrderFunc(int orderId, int price, int quantity) {
-		OrderList<AskOrder>& askOrderList = Singleton<OrderList<AskOrder>>::GetInstance();
 		AskOrder* askOrder = new AskOrder(orderId, price, quantity);
-		OrderBook::WithdrawOrderWrapper(askOrder, askOrderList);
+		OrderBook::WithdrawOrderWrapper(askOrder, &askOrderList);
 	}
 
 	void CreateOrder(string orderType, int orderId, int price, int quantity) {
@@ -166,16 +151,20 @@ public:
 		*/
 	}
 
+	OrderList<AskOrder> askOrderList;
+	OrderList<BidOrder> bidOrderList;
+
 private:
 	map<string, void (RegisterFactory::*)(int, int, int)> orderFuncMap;
 };
 
 template<typename T>
-void Order::InsertOrder(T* order, OrderList<T>& orderList) {
+void Order::InsertOrder(T* order, OrderList<T>* orderList) {
 	if (!order->quantity) return;
-	auto head = orderList.orderLinkList[order->price];
+	auto& orderLinkList = orderList->orderLinkList;
+	auto head = orderLinkList[order->price];
 	if (head == nullptr) {
-		orderList.orderLinkList[order->price] = order;
+		orderLinkList[order->price] = order;
 	}
 	else {
 		while (head->next) head = head->next;
@@ -184,19 +173,20 @@ void Order::InsertOrder(T* order, OrderList<T>& orderList) {
 }
 
 template<typename T>
-void Order::WithdrawOrder(T* order, OrderList<T>& orderList) {
-	T* head = orderList.orderLinkList[order->price];
+void Order::WithdrawOrder(T* order, OrderList<T>* orderList) {
+	auto& orderLinkList = orderList->orderLinkList;
+	T* head = orderLinkList[order->price];
 	if (head == nullptr) {
 		cout << "Withdraw failed      , orderId: " << order->orderId << "\n";
-		orderList.orderLinkList.erase(order->price);
+		orderLinkList.erase(order->price);
 		return;
 	}
 	if (head->orderId == order->orderId) {
 		cout << "Withdraw successfully, orderId: " << order->orderId << ", price: " << order->price << ", quantity: " << head->quantity << endl;
-		orderList.orderLinkList[order->price] = head->next;
+		orderLinkList[order->price] = head->next;
 		delete head;
 		head = nullptr;
-		if (orderList.orderLinkList[order->price] == nullptr) orderList.orderLinkList.erase(order->price);
+		if (orderLinkList[order->price] == nullptr) orderLinkList.erase(order->price);
 		return;
 	}
 	while (head->next) {
@@ -209,18 +199,17 @@ void Order::WithdrawOrder(T* order, OrderList<T>& orderList) {
 		head->next = head->next->next;
 		delete tmp;
 		// head = nullptr;
-		if (orderList.orderLinkList[order->price] == nullptr) orderList.orderLinkList.erase(order->price);
+		if (orderLinkList[order->price] == nullptr) orderLinkList.erase(order->price);
 		return;
 	}
 	cout << "Withdraw failed      , orderId: " << order->orderId << "\n";
 	return;
 }
 
-void AskOrder::MatchOrder()
-{
+void AskOrder::MatchOrder(OrderList<BidOrder>* bidOrderList) {
 	vector<int> erasePrice;
-	OrderList<BidOrder>& bidOrderList = Singleton<OrderList<BidOrder>>::GetInstance();
-	for (auto iter = bidOrderList.orderLinkList.rbegin(); iter != bidOrderList.orderLinkList.rend(); iter++) {
+	auto& bidOrderLinkList = bidOrderList->orderLinkList;
+	for (auto iter = bidOrderLinkList.rbegin(); iter != bidOrderLinkList.rend(); iter++) {
 		int bidPrice = iter->first;
 		if (bidPrice < price || quantity == 0) break;
 		BidOrder* head = iter->second;
@@ -239,20 +228,20 @@ void AskOrder::MatchOrder()
 		if (iter->second == nullptr) erasePrice.push_back(bidPrice);
 	}
 	for (auto iter = erasePrice.begin(); iter != erasePrice.end(); iter++) {
-		bidOrderList.orderLinkList.erase(*iter);
+		bidOrderLinkList.erase(*iter);
 	}
 }
 
-void BidOrder::MatchOrder() {
+void BidOrder::MatchOrder(OrderList<AskOrder>* askOrderList) {
 	vector<int> erasePrice;
-	OrderList<AskOrder>& askOrderList = Singleton<OrderList<AskOrder>>::GetInstance();
-	if (askOrderList.orderLinkList.size() == 0) return;
-	for (map<int, AskOrder*>::iterator iter = askOrderList.orderLinkList.lower_bound(price); true; iter--) {
-		if (iter == askOrderList.orderLinkList.end()) continue;
+	auto& askOrderLinkList = askOrderList->orderLinkList;
+	if (askOrderLinkList.size() == 0) return;
+	for (map<int, AskOrder*>::iterator iter = askOrderLinkList.lower_bound(price); true; iter--) {
+		if (iter == askOrderLinkList.end()) continue;
 		if (quantity == 0) break;
 		int askPrice = iter->first;
 		if (askPrice > price) {
-			if (iter == askOrderList.orderLinkList.begin()) break;
+			if (iter == askOrderLinkList.begin()) break;
 			continue;
 		}
 		AskOrder* head = iter->second;
@@ -269,10 +258,10 @@ void BidOrder::MatchOrder() {
 		}
 		iter->second = head;
 		if (iter->second == nullptr) erasePrice.push_back(askPrice);
-		if (iter == askOrderList.orderLinkList.begin()) break;
+		if (iter == askOrderLinkList.begin()) break;
 	}
 	for (auto iter = erasePrice.begin(); iter != erasePrice.end(); iter++) {
-		askOrderList.orderLinkList.erase(*iter);
+		askOrderLinkList.erase(*iter);
 	}
 }
 
@@ -287,7 +276,7 @@ void input() {
 	while (getline(in, orderRecord))
 	{
 		int indexOfComma[4];
-		for (int i = 0, cnt = 0; i < orderRecord.size(); i++) {
+		for (int i = 0, cnt = 0; i < (int)orderRecord.size(); i++) {
 			if (orderRecord[i] == ',') indexOfComma[cnt++] = i;
 		}
 		string orderType(""); 
@@ -298,7 +287,7 @@ void input() {
 		int price = stoi(orderRecord.substr(indexOfComma[3] + 1));
 		factory.CreateOrder(orderType, orderId, price, quantity);
 	}
-	OrderBook::PrintOrderListWrapper();
+	OrderBook::PrintOrderListWrapper(factory.askOrderList, factory.bidOrderList);
 }
 
 int main()
