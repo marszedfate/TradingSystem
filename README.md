@@ -82,6 +82,7 @@ but no trades happened yet.
 =\=\=\=\=\=\=\=\=
 
 ASK
+
 110: 5 10
 
 105: 3 7
@@ -111,6 +112,7 @@ And the order book will look like:
 =\=\=\=\=\=\=\=\=
 
 ASK
+
 110: 5 10
 
 105: 7
@@ -136,6 +138,7 @@ And now the order book will now look like:
 =\=\=\=\=\=\=\=\=
 
 ASK
+
 110: 5 10
 
 105: 6
@@ -162,6 +165,7 @@ The order book will look like:
 =\=\=\=\=\=\=\=\=
 
 ASK
+
 110: 5 10
 
 105: 6
@@ -182,6 +186,7 @@ Second trade will be 6 shares at price 100 USD:
 =\=\=\=\=\=\=\=\=
 
 ASK
+
 110: 5 10
 
 105: 6
@@ -201,6 +206,7 @@ Third trade will be 10 shares at price 90 USD:
 =\=\=\=\=\=\=\=\=
 
 ASK
+
 110: 5 10
 
 105: 6
@@ -220,6 +226,7 @@ Forth trade will be 2 shares at price 90 USD:
 =\=\=\=\=\=\=\=\=
 
 ASK
+
 110: 5 10
 
 105: 6
@@ -239,6 +246,7 @@ And finally the last trade will be 1 share at price 90 USD (partial match or par
 =\=\=\=\=\=\=\=\=
 
 ASK
+
 110: 5 10
 
 105: 6
