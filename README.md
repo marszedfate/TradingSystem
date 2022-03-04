@@ -22,6 +22,7 @@ Let’s say some (anonymous) market participant places a sell order for 5 shares
 Then order book will look like:
 
 =\=\=\=\=\=\=\=\=
+
 ASK
 
 110: 5
@@ -37,6 +38,7 @@ BID
 A moment after that some other market participant places a buy order for 10 shares at a price of 90 USD:
 
 =\=\=\=\=\=\=\=\=
+
 ASK
 
 110: 5
@@ -59,6 +61,7 @@ A difference between best BID and best ASK is called the spread and in this case
 A few moments later, a new sell order has been added - sell 10 shares at 110 USD:
 
 \=\=\=\=\=\=\=\=\=
+
 ASK
 
 110: 5 10
@@ -77,6 +80,7 @@ Let’s say a few moments later, several more orders from buyers and sellers are
 but no trades happened yet.
 
 =\=\=\=\=\=\=\=\=
+
 ASK
 110: 5 10
 
@@ -105,6 +109,7 @@ As a result we will see a trade:
 And the order book will look like:
 
 =\=\=\=\=\=\=\=\=
+
 ASK
 110: 5 10
 
@@ -129,6 +134,7 @@ Therefore we will have partial match with seller’s order at 105 USD. We will s
 And now the order book will now look like:
 
 =\=\=\=\=\=\=\=\=
+
 ASK
 110: 5 10
 
@@ -154,6 +160,7 @@ buy order of 4 shares at price level of 100 was added before buy order of 6 shar
 The order book will look like:
 
 =\=\=\=\=\=\=\=\=
+
 ASK
 110: 5 10
 
@@ -173,6 +180,7 @@ BID
 Second trade will be 6 shares at price 100 USD:
 
 =\=\=\=\=\=\=\=\=
+
 ASK
 110: 5 10
 
@@ -191,6 +199,7 @@ BID
 Third trade will be 10 shares at price 90 USD:
 
 =\=\=\=\=\=\=\=\=
+
 ASK
 110: 5 10
 
@@ -209,6 +218,7 @@ BID
 Forth trade will be 2 shares at price 90 USD:
 
 =\=\=\=\=\=\=\=\=
+
 ASK
 110: 5 10
 
@@ -227,6 +237,7 @@ BID
 And finally the last trade will be 1 share at price 90 USD (partial match or partial execution):
 
 =\=\=\=\=\=\=\=\=
+
 ASK
 110: 5 10
 
@@ -249,6 +260,7 @@ We will see trade:
 6 shares of XYZ were sold at 105 USD:
 
 =\=\=\=\=\=\=\=\=
+
 ASK
 
 110: 5 10
@@ -268,6 +280,7 @@ but the best sell order right now is at 110 USD so we place a new order at the l
 and the order book will look like:
 
 =\=\=\=\=\=\=\=\=
+
 ASK
 
 110: 5 10
