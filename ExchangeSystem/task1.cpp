@@ -16,10 +16,10 @@ class OrderList;
 class Order {
 public:
 	template<typename T>    // T: "XXXOrder"
-	void InsertOrder(T* order, OrderList<T>& orderList);
+	static void InsertOrder(T* order, OrderList<T>& orderList);
 
 	template<typename T>
-	void WithdrawOrder(T* order, OrderList<T>& orderList);
+	static void WithdrawOrder(T* order, OrderList<T>& orderList);
 
 	int orderId;
 	int price;
@@ -88,15 +88,15 @@ public:
 	static void MatchOrderWrapper(T1* order, OrderList<T2>& matchOrderList) {    // (order: askOrder) -> (matchOrderList: bidOrderList)
 		order->MatchOrder(matchOrderList);
 	}
-	
+
 	template<typename T>
 	static void InsertOrderWrapper(T* order, OrderList<T>& orderList) {
-		order->InsertOrder(order, orderList);
+		Order::InsertOrder(order, orderList);
 	}
 
 	template<typename T>
 	static void WithdrawOrderWrapper(T* order, OrderList<T>& orderList) {
-		order->WithdrawOrder(order, orderList);
+		Order::WithdrawOrder(order, orderList);
 	}
 
 	static void PrintOrderListWrapper(const OrderList<AskOrder>& askOrderList, const OrderList<BidOrder>& bidOrderList) {
@@ -157,7 +157,7 @@ private:
 };
 
 template<typename T>
-void Order::InsertOrder(T* order, OrderList<T>& orderList) {
+static void Order::InsertOrder(T* order, OrderList<T>& orderList) {
 	if (!order->quantity) return;
 	auto& orderLinkList = orderList.orderLinkList;
 	auto head = orderLinkList[order->price];
