@@ -10,20 +10,27 @@
 // #pragma warning: (disable: 4996)
 using namespace std;
 
-template<typename T>    // T: "XXXOrder"
 class OrderList;
 
 class Order {
 public:
-	template<typename T>    // T: "XXXOrder"
-	static void InsertOrder(T* order, OrderList<T>& orderList);
+	Order(int orderId, int price, int quantity) {
+		this->orderId = orderId;
+		this->price = price;
+		this->quantity = quantity;
+		this->next = nullptr;
+	}
 
-	template<typename T>
-	static void WithdrawOrder(T* order, OrderList<T>& orderList);
+	virtual void MatchOrder(OrderList* orderList) = 0;
+
+	void InsertOrder(OrderList* orderList);
+
+	void WithdrawOrder(OrderList* orderList);
 
 	int orderId;
 	int price;
 	int quantity;
+	Order* next;
 };
 
 class AskOrder;
@@ -31,40 +38,25 @@ class BidOrder;
 
 class AskOrder : public Order {
 public:
-	AskOrder(int orderId, int price, int quantity) {
-		this->orderId = orderId;
-		this->price = price;
-		this->quantity = quantity;
-		this->next = nullptr;
-	}
+	AskOrder(int orderId, int price, int quantity) : Order(orderId, price, quantity) {}
 	
-	void MatchOrder(OrderList<BidOrder>& bidOrderList);
-
-	AskOrder* next;
+	void MatchOrder(OrderList* bidOrderList);
 };
 
 class BidOrder : public Order {
 public:
-	BidOrder(int orderId, int price, int quantity) {
-		this->orderId = orderId;
-		this->price = price;
-		this->quantity = quantity;
-		this->next = nullptr;
-	}
+	BidOrder(int orderId, int price, int quantity) : Order(orderId, price, quantity) {}
 
-	void MatchOrder(OrderList<AskOrder>& askOrderList);
-
-	BidOrder* next;
+	void MatchOrder(OrderList* askOrderList);
 };
 
-template<typename T>    // T: "XXXOrder"
 class OrderList {
 public:
 	void PrintOrderList() const {
 		for (auto iter = orderLinkList.rbegin(); iter != orderLinkList.rend(); iter++) {
 			int price = iter->first;
 			cout << price << ": ";
-			T* head = iter->second;
+			Order* head = iter->second;
 			while (head != nullptr) {
 				cout << head->quantity << " ";
 				head = head->next;
@@ -79,31 +71,28 @@ public:
 		*/
 	}
 
-	map<int, T*> orderLinkList;    // key: price, value: "XXXOrder"s' linklist
+	map<int, Order*> orderLinkList;    // key: price, value: "XXXOrder"s' linklist
 };
 
 static class OrderBook {
 public:
-	template<typename T1, typename T2>
-	static void MatchOrderWrapper(T1* order, OrderList<T2>& matchOrderList) {    // (order: askOrder) -> (matchOrderList: bidOrderList)
+	static void MatchOrderWrapper(Order* order, OrderList* matchOrderList) {
 		order->MatchOrder(matchOrderList);
 	}
 
-	template<typename T>
-	static void InsertOrderWrapper(T* order, OrderList<T>& orderList) {
-		Order::InsertOrder(order, orderList);
+	static void InsertOrderWrapper(Order* order, OrderList* orderList) {
+		order->InsertOrder(orderList);
 	}
 
-	template<typename T>
-	static void WithdrawOrderWrapper(T* order, OrderList<T>& orderList) {
-		Order::WithdrawOrder(order, orderList);
+	static void WithdrawOrderWrapper(Order* order, OrderList* orderList) {
+		order->WithdrawOrder(orderList);
 	}
 
-	static void PrintOrderListWrapper(const OrderList<AskOrder>& askOrderList, const OrderList<BidOrder>& bidOrderList) {
+	static void PrintOrderListWrapper(const OrderList* askOrderList, const OrderList* bidOrderList) {
 		cout << "\n==========\nASK\n";
-		askOrderList.PrintOrderList();
+		askOrderList->PrintOrderList();
 		cout << "----------\n";
-		bidOrderList.PrintOrderList();
+		bidOrderList->PrintOrderList();
 		cout << "BID\n==========\n\n";
 	}
 };
@@ -119,24 +108,24 @@ public:
 
 	void BAOrderFunc(int orderId, int price, int quantity) {
 		BidOrder* bidOrder = new BidOrder(orderId, price, quantity);
-		OrderBook::MatchOrderWrapper(bidOrder, askOrderList);
-		OrderBook::InsertOrderWrapper(bidOrder, bidOrderList);
+		OrderBook::MatchOrderWrapper(bidOrder, &askOrderList);
+		OrderBook::InsertOrderWrapper(bidOrder, &bidOrderList);
 	}
 
 	void BXOrderFunc(int orderId, int price, int quantity) {
 		BidOrder* bidOrder = new BidOrder(orderId, price, quantity);
-		OrderBook::WithdrawOrderWrapper(bidOrder, bidOrderList);
+		OrderBook::WithdrawOrderWrapper(bidOrder, &bidOrderList);
 	}
 
 	void SAOrderFunc(int orderId, int price, int quantity) {
 		AskOrder* askOrder = new AskOrder(orderId, price, quantity);
-		OrderBook::MatchOrderWrapper(askOrder, bidOrderList);
-		OrderBook::InsertOrderWrapper(askOrder, askOrderList);
+		OrderBook::MatchOrderWrapper(askOrder, &bidOrderList);
+		OrderBook::InsertOrderWrapper(askOrder, &askOrderList);
 	}
 
 	void SXOrderFunc(int orderId, int price, int quantity) {
 		AskOrder* askOrder = new AskOrder(orderId, price, quantity);
-		OrderBook::WithdrawOrderWrapper(askOrder, askOrderList);
+		OrderBook::WithdrawOrderWrapper(askOrder, &askOrderList);
 	}
 
 	void CreateOrder(string orderType, int orderId, int price, int quantity) {
@@ -149,75 +138,73 @@ public:
 		*/
 	}
 
-	OrderList<AskOrder> askOrderList;
-	OrderList<BidOrder> bidOrderList;
+	OrderList askOrderList;
+	OrderList bidOrderList;
 
 private:
 	map<string, void (RegisterFactory::*)(int, int, int)> orderFuncMap;
 };
 
-template<typename T>
-static void Order::InsertOrder(T* order, OrderList<T>& orderList) {
-	if (!order->quantity) return;
-	auto& orderLinkList = orderList.orderLinkList;
-	auto head = orderLinkList[order->price];
+void Order::InsertOrder(OrderList* orderList) {
+	if (!this->quantity) return;
+	auto& orderLinkList = orderList->orderLinkList;
+	auto head = orderLinkList[this->price];
 	if (head == nullptr) {
-		orderLinkList[order->price] = order;
+		orderLinkList[this->price] = this;
 	}
 	else {
 		while (head->next) head = head->next;
-		head->next = order;
+		head->next = this;
 	}
 }
 
-template<typename T>
-void Order::WithdrawOrder(T* order, OrderList<T>& orderList) {
-	auto& orderLinkList = orderList.orderLinkList;
-	T* head = orderLinkList[order->price];
+void Order::WithdrawOrder(OrderList* orderList) {
+	auto& orderLinkList = orderList->orderLinkList;
+	Order* head = orderLinkList[this->price];
 	if (head == nullptr) {
-		cout << "Withdraw failed      , orderId: " << order->orderId << "\n";
-		orderLinkList.erase(order->price);
+		cout << "Withdraw failed      , orderId: " << this->orderId << "\n";
+		orderLinkList.erase(this->price);
 		return;
 	}
-	if (head->orderId == order->orderId) {
-		cout << "Withdraw successfully, orderId: " << order->orderId << "\n";
-		orderLinkList[order->price] = head->next;
+	if (head->orderId == this->orderId) {
+		cout << "Withdraw successfully, orderId: " << this->orderId << "\n";
+		orderLinkList[this->price] = head->next;
 		delete head;
 		head = nullptr;
-		if (orderLinkList[order->price] == nullptr) orderLinkList.erase(order->price);
+		if (orderLinkList[this->price] == nullptr) orderLinkList.erase(this->price);
 		return;
 	}
 	while (head->next) {
-		if (head->next->orderId != order->orderId) {
+		if (head->next->orderId != this->orderId) {
 			head = head->next;
 			continue;
 		}
-		cout << "Withdraw successfully, orderId: " << order->orderId << "\n";
+		cout << "Withdraw successfully, orderId: " << this->orderId << "\n";
 		auto tmp = head->next;
 		head->next = head->next->next;
 		delete tmp;
 		// head = nullptr;
-		if (orderLinkList[order->price] == nullptr) orderLinkList.erase(order->price);
+		if (orderLinkList[this->price] == nullptr) orderLinkList.erase(this->price);
 		return;
 	}
-	cout << "Withdraw failed      , orderId: " << order->orderId << "\n";
+	cout << "Withdraw failed      , orderId: " << this->orderId << "\n";
 	return;
 }
 
-void AskOrder::MatchOrder(OrderList<BidOrder>& bidOrderList) {
+void AskOrder::MatchOrder(OrderList* bidOrderList) {
 	vector<int> erasePrice;
-	auto& bidOrderLinkList = bidOrderList.orderLinkList;
+	auto& bidOrderLinkList = bidOrderList->orderLinkList;
 	for (auto iter = bidOrderLinkList.rbegin(); iter != bidOrderLinkList.rend(); iter++) {
 		int bidPrice = iter->first;
 		if (bidPrice < price || quantity == 0) break;
-		BidOrder* head = iter->second;
+		Order* head = iter->second;
 		while (head != nullptr && quantity) {
 			int minQuantity = min(quantity, head->quantity);
 			quantity -= minQuantity;
 			head->quantity -= minQuantity;
 			cout << "Trade happen         , orderId: " << orderId << ' ' << head->orderId << ", price: " << bidPrice << ", quantity: " << minQuantity << endl;
 			if (head->quantity == 0) {
-				BidOrder* tmp = head;
+				Order* tmp = head;
 				head = head->next;
 				delete tmp;
 			}
@@ -230,11 +217,11 @@ void AskOrder::MatchOrder(OrderList<BidOrder>& bidOrderList) {
 	}
 }
 
-void BidOrder::MatchOrder(OrderList<AskOrder>& askOrderList) {
+void BidOrder::MatchOrder(OrderList* askOrderList) {
 	vector<int> erasePrice;
-	auto& askOrderLinkList = askOrderList.orderLinkList;
+	auto& askOrderLinkList = askOrderList->orderLinkList;
 	if (askOrderLinkList.size() == 0) return;
-	for (map<int, AskOrder*>::iterator iter = askOrderLinkList.lower_bound(price); true; iter--) {
+	for (map<int, Order*>::iterator iter = askOrderLinkList.lower_bound(price); true; iter--) {
 		if (iter == askOrderLinkList.end()) continue;
 		if (quantity == 0) break;
 		int askPrice = iter->first;
@@ -242,14 +229,14 @@ void BidOrder::MatchOrder(OrderList<AskOrder>& askOrderList) {
 			if (iter == askOrderLinkList.begin()) break;
 			continue;
 		}
-		AskOrder* head = iter->second;
+		Order* head = iter->second;
 		while (head != nullptr && quantity) {
 			int minQuantity = min(quantity, head->quantity);
 			quantity -= minQuantity;
 			head->quantity -= minQuantity;
 			cout << "Trade happen         , orderId: " << head->orderId << ' ' << orderId << ", price: " << price << ", quantity: " << minQuantity << endl;
 			if (head->quantity == 0) {
-				AskOrder* tmp = head;
+				Order* tmp = head;
 				head = head->next;
 				delete tmp;
 			}
@@ -285,7 +272,7 @@ void input() {
 		int price = stoi(orderRecord.substr(indexOfComma[3] + 1));
 		factory.CreateOrder(orderType, orderId, price, quantity);
 	}
-	OrderBook::PrintOrderListWrapper(factory.askOrderList, factory.bidOrderList);
+	OrderBook::PrintOrderListWrapper(&factory.askOrderList, &factory.bidOrderList);
 }
 
 int main()
